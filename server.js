@@ -1,5 +1,7 @@
 const express = require("express")
 const app = express()
+const db = require('./database.js')
+const bcrypt = require("bcrypt")
 const jwt = require('jsonwebtoken')
 require('dotenv').config()
 
@@ -44,8 +46,30 @@ app.get('/granted', authenticationToken, (req, res) => {
 })
 
 // //////////////////////////////////////////////////
-app.get('/admin', (req, res) => {
-  res.render('admin.ejs')
+app.get('/admin', async (req, res) => {
+  const table = await db.getDataFromDB();
+  res.render('admin.ejs', {users: table})
+})
+
+app.get('/register', (req, res) => {
+  res.render('register.ejs')
+})
+
+app.post('/register', async (req, res) => {
+  const nameExist = await db.checkUser(req.body.name);
+  if (!nameExist) {
+    try {
+      dbEncryption = await bcrypt.hash(req.body.password, 10)
+      db.insertUserData(req, dbEncryption)
+      console.log('Username "' + req.body.name + '" sucessfully registered with password:', dbEncryption);
+    } catch (error) {
+      console.log(error);
+    }
+  } else {
+    console.log('Username exists');
+  }
+  req.method = "GET"
+  res.redirect('/identify')
 })
 
 app.listen(8000)
