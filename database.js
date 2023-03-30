@@ -33,4 +33,20 @@ function checkUser(name) {
   })
 }
 
-module.exports = { insertUserData , getDataFromDB, checkUser};
+  
+function getUser(username) {
+  return new Promise((resolve, reject) => {
+    db.all("SELECT * FROM USERS WHERE name LIKE ?", [username], (err, row) => {
+      if (err) {
+        console.log(err);
+        reject(err)
+      }
+      else {
+        resolve(row)
+      }
+    })
+  })
+}
+
+
+module.exports = { insertUserData , getDataFromDB, checkUser, getUser};
