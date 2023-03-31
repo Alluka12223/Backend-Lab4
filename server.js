@@ -43,7 +43,7 @@ app.get("/student2", async (req, res) => {
   res.render("student2.ejs")
 })
 
-app.get("/teacher", authorizeToken, authorizeRole(['teacher','admin']), async (req, res) => {
+app.get("/teacher", authorizeToken, authorizeRole(['teacher', 'admin']), async (req, res) => {
   res.render("teacher.ejs")
 })
 
@@ -78,14 +78,14 @@ app.post('/identify', async (req, res) => {
     try {
       if (await bcrypt.compare(password, user[0].password)) {
         console.log('true in compare');
-        const userObj = { userID: user[0].userID, name: user[0].name, role: user[0].role}
+        const userObj = { userID: user[0].userID, name: user[0].name, role: user[0].role }
         const token = jwt.sign(userObj, process.env.TOKEN)
         // console.log('token', process.env.TOKEN);
         const cookieOptions = {
           httpOnly: true, // Set cookie to httpOnly it can only be accessed by the server and not by client-side scripts. 
           maxAge: 86400000 // Set cookie to expire after 1 day (in milliseconds)
         };
-        
+
         res.cookie("jwt", token, cookieOptions);
 
         req.method = "GET"
@@ -149,6 +149,43 @@ function authorizeToken(req, res, next) {
     return res.status(403).redirect("/identify");
   }
 }
+
+app.get("/users/:userID", authorizeToken, async (req, res) => {
+  const token = req.cookies.jwt
+  const decryptedToken = jwt.verify(token, process.env.TOKEN)
+  let user = await db.getUser(decryptedToken.name)
+  user = user[0]
+  console.log('user', user);
+  console.log('para', req.params.userID);
+  console.log('dectok', decryptedToken.name);
+  console.log('role,name', user.role, user.name);
+  try {
+    // if (req.params.name !== decryptedToken.name) {
+    //   return res.status(401).redirect(`/users/${user.userID}`)
+    // }
+
+    if (user.role == 'student' && user.name == 'stud1') {
+      console.log('1');
+      res.render('student1.ejs', { User: user })
+
+    } else if (user.role == 'student' && user.name != 'stud1') {
+      console.log('2');
+      res.render('student2.ejs', { User: user })
+    }
+
+  } catch (error) {
+    console.log(error);
+  }
+  // else if (user.role === 'teacher') {
+
+
+  // } else if (user.role==='admin') {
+
+  // }
+  // res.render("start.ejs")
+  // return
+})
+
 
 // TODO: logout
 
