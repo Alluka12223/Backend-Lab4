@@ -35,12 +35,26 @@ app.get("/start", authorizeToken, authorizeRole(['student', 'teacher', 'admin'])
   res.render("start.ejs")
 })
 
-app.get("/student1", async (req, res) => {
-  res.render("student1.ejs")
+app.get("/student1", authorizeToken, authorizeRole(["student", "teacher", "admin"]), async (req, res) => {
+  const token = req.cookies.jwt
+  const decryptedToken = jwt.verify(token, process.env.TOKEN)
+  let user = await db.getUser(decryptedToken.name)
+  if (user[0].name === 'student1') {
+    res.render("student1.ejs", { User: user[0] })
+  } else {
+    res.sendStatus(401).render('fail.ejs')
+  }
 })
 
-app.get("/student2", async (req, res) => {
-  res.render("student2.ejs")
+app.get("/student2", authorizeToken, authorizeRole(["student", "teacher", "admin"]), async (req, res) => {
+  const token = req.cookies.jwt
+  const decryptedToken = jwt.verify(token, process.env.TOKEN)
+  let user = await db.getUser(decryptedToken.name)
+  if (user[0].name === 'student2') {
+    res.render("student2.ejs", { User: user[0] })
+  } else {
+    res.status(401).render('fail.ejs')
+  }
 })
 
 app.get("/teacher", authorizeToken, authorizeRole(['teacher', 'admin']), async (req, res) => {
@@ -70,17 +84,13 @@ app.post('/register', async (req, res) => {
 
 app.post('/identify', async (req, res) => {
   const { name, password } = req.body
-  // console.log('pass', password);
   let userExist = await db.checkUser(name)
   if (userExist) {
     let user = await db.getUser(name)
-    // console.log('user:', user[0].password);
     try {
       if (await bcrypt.compare(password, user[0].password)) {
-        console.log('true in compare');
         const userObj = { userID: user[0].userID, name: user[0].name, role: user[0].role }
         const token = jwt.sign(userObj, process.env.TOKEN)
-        // console.log('token', process.env.TOKEN);
         const cookieOptions = {
           httpOnly: true, // Set cookie to httpOnly it can only be accessed by the server and not by client-side scripts. 
           maxAge: 86400000 // Set cookie to expire after 1 day (in milliseconds)
@@ -106,9 +116,7 @@ app.post('/identify', async (req, res) => {
 async function getUserFromToken(req) {
   const token = req.cookies.jwt
   const decryptedToken = jwt.verify(token, process.env.TOKEN)
-  // console.log('dectoken', decryptedToken);
   let user = await db.getUser(decryptedToken.name)
-  // console.log('user from token', user[0]);
   return user[0]
 }
 
@@ -116,7 +124,6 @@ function authorizeRole(requiredRoles) {
   return async (req, res, next) => {
     try {
       const user = await getUserFromToken(req)
-      // console.log('role user', user);
       if (requiredRoles.includes(user.role)) {
         next()
       } else {
@@ -132,20 +139,16 @@ function authorizeRole(requiredRoles) {
 
 function authorizeToken(req, res, next) {
   const token = req.cookies.jwt
-  console.log('token1', token);
   if (!token) {
     return res.status(401).redirect("/identify");
   }
   try {
     const decodedToken = jwt.verify(token, process.env.TOKEN);
-    // console.log('auth', decodedToken);
     req.user = decodedToken;
-    // console.log('req user', req.user);
     next();
 
   } catch (error) {
     console.log(error);
-    // 403 - forbidden
     return res.status(403).redirect("/identify");
   }
 }
@@ -155,38 +158,26 @@ app.get("/users/:userID", authorizeToken, async (req, res) => {
   const decryptedToken = jwt.verify(token, process.env.TOKEN)
   let user = await db.getUser(decryptedToken.name)
   user = user[0]
-  console.log('user', user);
-  console.log('para', req.params.userID);
-  console.log('dectok', decryptedToken.name);
-  console.log('role,name', user.role, user.name);
   try {
-    // if (req.params.name !== decryptedToken.name) {
-    //   return res.status(401).redirect(`/users/${user.userID}`)
-    // }
-
-    if (user.role == 'student' && user.name == 'stud1') {
-      console.log('1');
-      res.render('student1.ejs', { User: user })
-
-    } else if (user.role == 'student' && user.name != 'stud1') {
-      console.log('2');
-      res.render('student2.ejs', { User: user })
+    if (user.userID != req.params.userID) {
+      res.render('fail.ejs')
     }
-
+    else if (user.role === 'admin' || user.role === 'teacher' || (user.role == 'student' && user.name == 'student1')) {
+      res.render('student1.ejs', { User: user })
+    } else if (user.role === 'admin' || user.role === 'teacher' || (user.role == 'student' && user.name != 'student1')) {
+      res.render('student2.ejs', { User: user })
+    } else if (user.role === 'admin' || user.role === 'teacher') {
+      res.render('teacher.ejs')
+    } else if (user.role === 'admin') {
+      res.render('admin.ejs')
+    }
   } catch (error) {
     console.log(error);
   }
-  // else if (user.role === 'teacher') {
-
-
-  // } else if (user.role==='admin') {
-
-  // }
-  // res.render("start.ejs")
-  // return
 })
 
+app.all("*", (req, res) => { res.status(404).render("error.ejs") })
 
-// TODO: logout
-
-app.listen(8000)
+app.listen(8000, async () => {
+  console.log("Server listening on PORT " + 8000)
+})
